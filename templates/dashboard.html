@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Attendance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light dark;
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#18232e; --muted:#5d6b78; --line:#dde3e9;
+  --accent:#0b6e7f; --accent-ink:#ffffff;
+  --ok:#17794a; --ok-bg:#e1f3e8; --bad:#b0352b; --bad-bg:#fbe8e5; --warn:#7a5600; --warn-bg:#fff2cf;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f171e; --surface:#17222c; --ink:#e8eef3; --muted:#93a3b1; --line:#2a3946;
+    --accent:#4cbbcf; --accent-ink:#04222a;
+    --ok:#6bd8a2; --ok-bg:#12352a; --bad:#ff948a; --bad-bg:#3b1b18; --warn:#f0c968; --warn-bg:#3a2f10;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select{font:inherit}
+.top{background:var(--surface);border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.top h1{font-size:18px;margin:0;font-weight:600}
+nav{display:flex;gap:2px;overflow-x:auto;padding:0 14px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+nav button{background:none;border:0;padding:12px 14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:18px}
+h2{font-size:17px;margin:0 0 12px;font-weight:600}
+h3{font-size:16px;margin:0;font-weight:600}
+h4{font-size:13px;margin:0 0 6px;color:var(--muted);font-weight:500}
+p{margin:0}
+.muted{color:var(--muted)}
+.empty{color:var(--muted);padding:6px 0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.row>label{flex:1 1 150px}
+.row>.btn{flex:0 0 auto}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);min-width:0;width:100%}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{padding:8px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;text-decoration:none;display:inline-block;line-height:1.4}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.small{padding:3px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-weight:500;color:var(--muted);font-size:13px;white-space:nowrap}
+td.actions{white-space:nowrap;text-align:right}
+td.actions .btn{margin-left:4px}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:500;white-space:nowrap}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.mute{background:var(--bg);color:var(--muted)}
+.pct{font-weight:600;color:var(--ok)} .pct.low{color:var(--bad)}
+.mk-P{color:var(--ok);font-weight:600} .mk-A{color:var(--bad);font-weight:600}
+.stick{position:sticky;left:0;background:var(--surface)}
+/* live lecture */
+.live{border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:10px;padding:16px;margin-bottom:14px;background:var(--surface)}
+.live-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.count{display:flex;align-items:baseline;gap:10px}
+.count .big{font-size:44px;font-weight:600;line-height:1;color:var(--accent)}
+.bar{height:6px;border-radius:3px;background:var(--line);margin:10px 0 14px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:640px){.cols{grid-template-columns:1fr}}
+.plist{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
+.plist li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;max-height:260px;overflow:auto}
+.chip{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:2px 10px;font-size:13px}
+/* misc */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.seg button{background:var(--surface);border:0;padding:8px 14px;cursor:pointer;color:var(--muted)}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:500}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pills button{padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.pills button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.found{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.found label{flex:1 1 180px}
+.pulse{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);margin-right:8px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.pulse{animation:none}}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:20px;width:92%;max-width:440px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog .row{margin-top:12px}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;z-index:20}
+#toast.show{opacity:1} #toast.bad{background:var(--bad);color:#fff}
+#login{max-width:360px;margin:12vh auto;padding:0 20px}
+#login h1{font-size:22px;margin:0 0 4px} #login .panel{margin-top:16px} #login label{margin-bottom:12px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login" class="hide">
+  <h1>Smart Attendance</h1>
+  <p class="muted">Log in to manage lectures and view attendance.</p>
+  <form id="loginForm" class="panel">
+    <label>Username<input id="lgUser" autocomplete="username" required></label>
+    <label>Password<input id="lgPass" type="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit" style="width:100%">Log in</button>
+  </form>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hide">
+  <div class="top">
+    <h1>Smart Attendance</h1>
+    <button class="btn small" data-a="logout">Log out</button>
+  </div>
+  <nav id="nav">
+    <button data-a="tab" data-t="lecture" class="on">Attendance</button>
+    <button data-a="tab" data-t="reports">Reports</button>
+    <button data-a="tab" data-t="students">Students</button>
+    <button data-a="tab" data-t="subjects">Subjects</button>
+    <button data-a="tab" data-t="devices">Devices</button>
+  </nav>
+
+  <main>
+    <!-- LECTURE -->
+    <section id="tab-lecture">
+      <div class="panel">
+        <h2>Start attendance</h2>
+        <div class="row">
+          <label>Classroom device<select id="stDevice"></select></label>
+          <label>Semester<select id="stSem"></select></label>
+          <label>Subject<select id="stSubject"></select></label>
+          <label style="flex:0 1 190px">Keep open for (minutes)<input id="stMinutes" type="number" min="5" max="480" value="20"></label>
+          <button class="btn primary" data-a="startLecture">Start attendance</button>
+        </div>
+        <p class="muted" style="margin-top:10px">Attendance closes by itself after the minutes you set. Students who have not tapped by then are marked absent, and later taps are ignored.</p>
+      </div>
+      <h2>Attendance open</h2>
+      <div id="activeList"></div>
+    </section>
+
+    <!-- REPORTS -->
+    <section id="tab-reports" class="hide">
+      <div class="seg">
+        <button data-a="repview" data-v="lecture" class="on">By lecture</button>
+        <button data-a="repview" data-v="subject">By subject</button>
+        <button data-a="repview" data-v="student">By student</button>
+      </div>
+
+      <div id="rep-lecture">
+        <div class="panel">
+          <div class="row">
+            <label>Semester<select id="rlSem"></select></label>
+            <label>Subject<select id="rlSub"></select></label>
+            <label>From<input id="rlFrom" type="date"></label>
+            <label>To<input id="rlTo" type="date"></label>
+            <button class="btn primary" data-a="showLectures">Show lectures</button>
+          </div>
+        </div>
+        <div class="panel hide" id="rlList"></div>
+        <div class="panel hide" id="rlDetail"></div>
+      </div>
+
+      <div id="rep-subject" class="hide">
+        <div class="panel">
+          <div class="row">
+            <label>Semester<select id="rsSem"></select></label>
+            <label>Subject<select id="rsSub"></select></label>
+            <label>From<input id="rsFrom" type="date"></label>
+            <label>To<input id="rsTo" type="date"></label>
+            <button class="btn primary" data-a="showSubject">Show attendance</button>
+          </div>
+        </div>
+        <div class="panel hide" id="rsOut"></div>
+      </div>
+
+      <div id="rep-student" class="hide">
+        <div class="panel">
+          <div class="row">
+            <label>Semester<select id="rtSem"></select></label>
+            <label>Subject<select id="rtSub"></select></label>
+            <label>Student<select id="rtStu"></select></label>
+            <label>From<input id="rtFrom" type="date"></label>
+            <label>To<input id="rtTo" type="date"></label>
+            <button class="btn primary" data-a="showStudent">Show attendance</button>
+          </div>
+        </div>
+        <div class="panel hide" id="rtOut"></div>
+      </div>
+    </section>
+
+    <!-- STUDENTS -->
+    <section id="tab-students" class="hide">
+      <div class="panel">
+        <h2>Add a student</h2>
+        <div class="row">
+          <label>Name<input id="nsName"></label>
+          <label>Enrollment number<input id="nsEnr"></label>
+          <label>Semester<select id="nsSem"></select></label>
+          <label>Division (optional)<input id="nsDiv"></label>
+          <button class="btn primary" data-a="addStudent">Add student</button>
+        </div>
+        <p class="muted" style="margin-top:10px">After adding, press Assign card on the student's row and tap a card on a classroom device.</p>
+      </div>
+      <div class="panel">
+        <div class="row" style="margin-bottom:10px">
+          <label style="max-width:220px">Show<select id="stuSem"></select></label>
+        </div>
+        <div class="scroll" id="stuTable"></div>
+      </div>
+    </section>
+
+    <!-- SUBJECTS -->
+    <section id="tab-subjects" class="hide">
+      <div class="panel">
+        <h2>Subjects by semester</h2>
+        <div class="pills" id="subPills"></div>
+        <div class="row" style="margin-bottom:14px">
+          <label>New subject name<input id="subName" placeholder="e.g. Data Structures"></label>
+          <button class="btn primary" data-a="addSubject">Add subject</button>
+        </div>
+        <div class="scroll" id="subTable"></div>
+      </div>
+    </section>
+
+    <!-- DEVICES -->
+    <section id="tab-devices" class="hide">
+      <div class="panel">
+        <h2>Add a classroom device</h2>
+        <div id="discoverBox"></div>
+      </div>
+      <div class="panel">
+        <h2>Your devices</h2>
+        <div class="scroll" id="devTable"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ DIALOGS ============ -->
+<dialog id="assignDlg">
+  <h3 id="asTitle">Assign card</h3>
+  <div id="asStep1">
+    <p class="muted" style="margin-top:6px">Choose the device the student will tap on.</p>
+    <div class="row"><label>Device<select id="asDevice"></select></label></div>
+    <div class="row"><button class="btn primary" data-a="assignStart">Start</button><button class="btn" data-a="assignClose">Close</button></div>
+  </div>
+  <div id="asStep2" class="hide">
+    <p style="margin-top:10px"><span class="pulse"></span><span id="asWait">Tap the card on the device now.</span></p>
+    <div class="row"><button class="btn" data-a="assignClose">Cancel</button></div>
+  </div>
+  <p id="asMsg" style="margin-top:12px"></p>
+</dialog>
+
+<dialog id="editDlg">
+  <h3>Edit student</h3>
+  <div class="row"><label>Name<input id="edName"></label></div>
+  <div class="row"><label>Semester<select id="edSem"></select></label><label>Division<input id="edDiv"></label></div>
+  <div class="row"><button class="btn primary" data-a="editSave">Save changes</button><button class="btn" data-a="editClose">Cancel</button></div>
+</dialog>
+
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const TZ = 'Asia/Kolkata';
+let NUM_SEM = 7, loggedIn = false, curTab = 'lecture';
+
+/* ---------- formatting ---------- */
+const fmtTime = iso => iso ? new Date(iso).toLocaleTimeString('en-IN',{timeZone:TZ,hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+const fmtSec  = iso => iso ? new Date(iso).toLocaleTimeString('en-IN',{timeZone:TZ,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}) : '';
+const fmtDT   = iso => iso ? new Date(iso).toLocaleString('en-IN',{timeZone:TZ,day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:true}) : '';
+function ago(iso){
+  if(!iso) return 'never';
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso)) / 1000));
+  if(s < 60) return s + ' s ago';
+  if(s < 3600) return Math.floor(s/60) + ' min ago';
+  if(s < 86400) return Math.floor(s/3600) + ' h ago';
+  return Math.floor(s/86400) + ' d ago';
+}
+const pct = p => `<span class="pct ${p < 75 ? 'low' : ''}">${p}%</span>`;
+
+/* ---------- api / ui helpers ---------- */
+async function api(path, method='GET', data){
+  const opt = {method, credentials:'same-origin', headers:{}};
+  if(data !== undefined){ opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(data); }
+  let r;
+  try { r = await fetch(path, opt); } catch(e){ throw new Error('Cannot reach the server. Check your connection.'); }
+  if(r.status === 401 && path !== '/api/login'){ showLogin(); throw new Error('Please log in again'); }
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok) throw new Error(j.error || 'Something went wrong');
+  return j;
+}
+let toastTimer;
+function toast(msg, bad){
+  const t = $('toast'); t.textContent = msg; t.className = 'show' + (bad ? ' bad' : '');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = '', 3500);
+}
+async function run(fn){ try { await fn(); } catch(e){ toast(e.message, true); } }
+const handlers = {};
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]');
+  if(!b || b.disabled) return;
+  const fn = handlers[b.dataset.a];
+  if(fn) run(() => fn(b.dataset, b));
+});
+function semOpts(withAll, allLabel='All semesters'){
+  let o = withAll ? `<option value="">${allLabel}</option>` : '';
+  for(let i = 1; i <= NUM_SEM; i++) o += `<option value="${i}">Semester ${i}</option>`;
+  return o;
+}
+async function fillSubjects(selId, sem, opt={}){
+  const q = new URLSearchParams();
+  if(sem) q.set('semester', sem);
+  if(opt.hidden) q.set('include_hidden', '1');
+  const list = await api('/api/subjects?' + q);
+  let html = opt.blank ? `<option value="">${opt.blank}</option>` : '';
+  html += list.map(s => `<option value="${s.id}">${h(s.name)}${sem ? '' : ' (Sem ' + s.semester + ')'}${s.hidden ? ' (hidden)' : ''}</option>`).join('');
+  if(!list.length && !opt.blank) html = '<option value="">No subjects yet. Add some in Subjects.</option>';
+  $(selId).innerHTML = html;
+}
+async function fillStudents(selId, sem){
+  const list = await api('/api/students' + (sem ? '?semester=' + sem : ''));
+  $(selId).innerHTML = list.length
+    ? list.map(s => `<option value="${h(s.enrollment)}">${h(s.enrollment)} - ${h(s.name)}</option>`).join('')
+    : '<option value="">No students yet</option>';
+}
+
+/* ---------- login / tabs ---------- */
+function showLogin(){ loggedIn = false; $('app').classList.add('hide'); $('login').classList.remove('hide'); }
+async function showApp(){
+  loggedIn = true; $('login').classList.add('hide'); $('app').classList.remove('hide');
+  ['stSem','nsSem','edSem','rsSem'].forEach(id => $(id).innerHTML = semOpts(false));
+  ['stuSem','rlSem','rtSem'].forEach(id => $(id).innerHTML = semOpts(true));
+  go('lecture');
+}
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try { await api('/api/login','POST',{username:$('lgUser').value.trim(), password:$('lgPass').value}); $('lgPass').value=''; await showApp(); }
+  catch(err){ toast(err.message, true); }
+});
+handlers.logout = async () => { await api('/api/logout','POST',{}); showLogin(); };
+handlers.tab = d => go(d.t);
+
+const loaders = {
+  lecture: async () => { await Promise.all([refreshDeviceSelect(), loadActive(), fillSubjects('stSubject', $('stSem').value)]); },
+  reports: async () => { await Promise.all([
+      fillSubjects('rlSub', $('rlSem').value, {hidden:true, blank:'All subjects'}),
+      fillSubjects('rsSub', $('rsSem').value, {hidden:true}),
+      fillSubjects('rtSub', $('rtSem').value, {hidden:true, blank:'All subjects'}),
+      fillStudents('rtStu', $('rtSem').value)]); },
+  students: loadStudents,
+  subjects: loadSubjects,
+  devices: loadDevices,
+};
+const pollers = { lecture: async () => { await Promise.all([refreshDeviceSelect(), loadActive()]); }, devices: loadDevices };
+function go(t){
+  curTab = t;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  ['lecture','reports','students','subjects','devices'].forEach(x => $('tab-' + x).classList.toggle('hide', x !== t));
+  run(loaders[t]);
+}
+setInterval(() => { if(loggedIn && !document.hidden && pollers[curTab]) pollers[curTab]().catch(() => {}); }, 3000);
+
+/* ================= LECTURE ================= */
+async function refreshDeviceSelect(){
+  const d = await api('/api/devices');
+  const sel = $('stDevice'), prev = sel.value;
+  sel.innerHTML = d.devices.length
+    ? d.devices.map(x => `<option value="${h(x.device_id)}" ${x.online ? '' : 'disabled'}>${h(x.name)} ${x.online ? '(online)' : '(offline)'}</option>`).join('')
+    : '<option value="">No devices yet. Add one in Devices.</option>';
+  const ok = [...sel.options].find(o => o.value === prev && !o.disabled);
+  if(ok) sel.value = prev; else { const f = [...sel.options].find(o => !o.disabled); if(f) sel.value = f.value; }
+}
+$('stSem').addEventListener('change', () => run(() => fillSubjects('stSubject', $('stSem').value)));
+handlers.startLecture = async () => {
+  await api('/api/sessions/start','POST',{device_id:$('stDevice').value, subject_id:$('stSubject').value, minutes:$('stMinutes').value});
+  toast('Attendance is open. Students can tap now.'); await loadActive();
+};
+function liveCard(s){
+  const p = s.roster_size ? Math.round(100 * s.present.length / s.roster_size) : 0;
+  const present = s.present.length
+    ? `<ul class="plist">${s.present.map(x => `<li><span>${h(x.name)} <span class="muted">${h(x.enrollment)}</span></span><span class="muted">${fmtSec(x.time)}</span></li>`).join('')}</ul>`
+    : '<p class="empty">Nobody has tapped yet.</p>';
+  const waiting = s.waiting.length
+    ? `<div class="chips">${s.waiting.map(x => `<span class="chip">${h(x.name)}</span>`).join('')}</div>`
+    : '<p class="empty">Everyone has tapped.</p>';
+  return `<article class="live">
+    <div class="live-head">
+      <div><h3>${h(s.subject_name)}</h3>
+      <p class="muted">Semester ${s.semester}, ${h(s.device_name)}. Started ${fmtTime(s.start)}, closes ${fmtTime(s.planned_end)}.</p></div>
+      <button class="btn danger" data-a="endLecture" data-id="${s.id}">Close attendance</button>
+    </div>
+    <div class="count"><span class="big">${s.present.length}</span><span class="muted">of ${s.roster_size} present</span></div>
+    <div class="bar"><i style="width:${p}%"></i></div>
+    <div class="cols"><div><h4>Present</h4>${present}</div><div><h4>Not yet tapped</h4>${waiting}</div></div>
+  </article>`;
+}
+async function loadActive(){
+  const list = await api('/api/sessions/active');
+  $('activeList').innerHTML = list.length ? list.map(liveCard).join('')
+    : '<p class="empty">Attendance is not open. Start it above and students can tap in.</p>';
+}
+handlers.endLecture = async d => {
+  if(!confirm('Close attendance now? Everyone who has not tapped will be marked absent.')) return;
+  await api(`/api/sessions/${d.id}/end`,'POST',{}); toast('Attendance closed and saved. See it in Reports.'); await loadActive();
+};
+
+/* ================= DEVICES ================= */
+let discSig = '';
+async function loadDevices(){
+  const d = await api('/api/devices');
+  // device table
+  $('devTable').innerHTML = d.devices.length ? `<table><thead><tr><th>Name</th><th>Status</th><th>Last heard</th><th>Device ID</th><th></th></tr></thead><tbody>${
+    d.devices.map(x => `<tr><td>${h(x.name)}</td>
+      <td><span class="badge ${x.online ? 'ok' : 'bad'}">${x.online ? 'Online' : 'Offline'}</span></td>
+      <td>${ago(x.last_seen)}</td><td class="muted">${h(x.device_id)}</td>
+      <td class="actions"><button class="btn small" data-a="renameDev" data-id="${h(x.device_id)}" data-name="${h(x.name)}">Rename</button>
+      <button class="btn small danger" data-a="removeDev" data-id="${h(x.device_id)}" data-name="${h(x.name)}">Remove</button></td></tr>`).join('')
+    }</tbody></table>` : '<p class="empty">No devices yet. Power on your ESP32, press Add new device, and it will appear here.</p>';
+  // discovery box (only redraw when something changed, so typed names are kept)
+  const sig = d.discovering + '|' + d.pending.map(x => x.device_id).join(',');
+  if(sig === discSig) return;
+  discSig = sig;
+  if(!d.discovering){
+    $('discoverBox').innerHTML = '<p class="muted" style="margin-bottom:10px">Switch on the ESP32 in the classroom, then press the button. New devices show up here within about 15 seconds.</p><button class="btn primary" data-a="discover">Add new device</button>';
+    return;
+  }
+  const found = d.pending.length ? d.pending.map(x => `<div class="found"><label>Name this device<input id="nm_${h(x.device_id)}" placeholder="e.g. Room 101"></label>
+      <span class="muted" style="flex:1 1 160px">ID ${h(x.device_id)}</span>
+      <button class="btn primary" data-a="acceptDev" data-id="${h(x.device_id)}">Save device</button></div>`).join('')
+    : '<p class="muted" style="margin-top:6px">Nothing found yet. Make sure the ESP32 is powered and connected to WiFi.</p>';
+  $('discoverBox').innerHTML = `<p><span class="pulse"></span>Searching for new devices until ${fmtTime(d.discovery_until)}</p>${found}
+    <div style="margin-top:12px"><button class="btn" data-a="stopDiscover">Stop searching</button></div>`;
+}
+handlers.discover = async () => { await api('/api/devices/discover','POST',{}); discSig=''; await loadDevices(); };
+handlers.stopDiscover = async () => { await api('/api/devices/stop-discovery','POST',{}); discSig=''; await loadDevices(); };
+handlers.acceptDev = async d => {
+  await api('/api/devices/accept','POST',{device_id:d.id, name:$('nm_' + d.id).value});
+  toast('Device saved.'); discSig=''; await loadDevices();
+};
+handlers.renameDev = async d => {
+  const n = prompt('New name for this device', d.name); if(!n || !n.trim()) return;
+  await api('/api/devices/' + encodeURIComponent(d.id),'PUT',{name:n}); await loadDevices();
+};
+handlers.removeDev = async d => {
+  if(!confirm(`Remove ${d.name}? It will need to be added again to be used.`)) return;
+  await api('/api/devices/' + encodeURIComponent(d.id),'DELETE'); discSig=''; await loadDevices();
+};
+
+/* ================= SUBJECTS ================= */
+let subSem = 1;
+function drawPills(){
+  let o = ''; for(let i = 1; i <= NUM_SEM; i++) o += `<button data-a="subSem" data-s="${i}" class="${i === subSem ? 'on' : ''}">Semester ${i}</button>`;
+  $('subPills').innerHTML = o;
+}
+async function loadSubjects(){
+  drawPills();
+  const list = await api('/api/subjects?semester=' + subSem);
+  $('subTable').innerHTML = list.length ? `<table><tbody>${list.map(s => `<tr><td>${h(s.name)}</td><td class="actions">
+      <button class="btn small" data-a="renameSub" data-id="${s.id}" data-name="${h(s.name)}">Rename</button>
+      <button class="btn small danger" data-a="hideSub" data-id="${s.id}" data-name="${h(s.name)}">Remove</button></td></tr>`).join('')}</tbody></table>`
+    : `<p class="empty">No subjects in semester ${subSem} yet. Add the first one above.</p>`;
+}
+handlers.subSem = async d => { subSem = +d.s; await loadSubjects(); };
+handlers.addSubject = async () => {
+  await api('/api/subjects','POST',{semester:subSem, name:$('subName').value}); $('subName').value=''; await loadSubjects();
+};
+handlers.renameSub = async d => {
+  const n = prompt('New subject name', d.name); if(!n || !n.trim()) return;
+  await api('/api/subjects/' + d.id,'PUT',{name:n}); await loadSubjects();
+};
+handlers.hideSub = async d => {
+  if(!confirm(`Remove ${d.name}? Past attendance for it stays in Reports.`)) return;
+  await api('/api/subjects/' + d.id,'DELETE'); await loadSubjects();
+};
+
+/* ================= STUDENTS ================= */
+async function loadStudents(){
+  const sem = $('stuSem').value;
+  const list = await api('/api/students' + (sem ? '?semester=' + sem : ''));
+  $('stuTable').innerHTML = list.length ? `<table><thead><tr><th>Name</th><th>Enrollment</th><th>Sem</th><th>Division</th><th>Card</th><th></th></tr></thead><tbody>${
+    list.map(s => `<tr><td>${h(s.name)}</td><td>${h(s.enrollment)}</td><td>${s.semester}</td><td>${h(s.division)}</td>
+      <td>${s.has_card ? `<span class="badge ok">Assigned ${h(s.uid.slice(-4))}</span>` : '<span class="badge warn">No card</span>'}</td>
+      <td class="actions">
+        <button class="btn small primary" data-a="assignOpen" data-enr="${h(s.enrollment)}" data-name="${h(s.name)}" data-card="${s.has_card ? 1 : 0}">${s.has_card ? 'Replace card' : 'Assign card'}</button>
+        <button class="btn small" data-a="editOpen" data-enr="${h(s.enrollment)}" data-name="${h(s.name)}" data-sem="${s.semester}" data-div="${h(s.division)}">Edit</button>
+        <button class="btn small danger" data-a="delStudent" data-enr="${h(s.enrollment)}" data-name="${h(s.name)}">Delete</button></td></tr>`).join('')
+    }</tbody></table>` : '<p class="empty">No students here yet. Add one above.</p>';
+}
+$('stuSem').addEventListener('change', () => run(loadStudents));
+handlers.addStudent = async () => {
+  await api('/api/students','POST',{name:$('nsName').value, enrollment:$('nsEnr').value, semester:$('nsSem').value, division:$('nsDiv').value});
+  $('nsName').value = ''; $('nsEnr').value = ''; $('nsName').focus(); toast('Student added. Assign a card next.'); await loadStudents();
+};
+handlers.delStudent = async d => {
+  if(!confirm(`Delete ${d.name}? Their past attendance stays in Reports.`)) return;
+  await api('/api/students/' + encodeURIComponent(d.enr),'DELETE'); await loadStudents();
+};
+let editEnr = null;
+handlers.editOpen = d => { editEnr = d.enr; $('edName').value = d.name; $('edSem').value = d.sem; $('edDiv').value = d.div; $('editDlg').showModal(); };
+handlers.editClose = () => $('editDlg').close();
+handlers.editSave = async () => {
+  await api('/api/students/' + encodeURIComponent(editEnr),'PUT',{name:$('edName').value, semester:$('edSem').value, division:$('edDiv').value});
+  $('editDlg').close(); toast('Changes saved.'); await loadStudents();
+};
+
+/* ---- card assignment ---- */
+let asEnr = null, asTimer = null;
+function stopAssignPoll(){ clearInterval(asTimer); asTimer = null; }
+handlers.assignOpen = async d => {
+  asEnr = d.enr;
+  $('asTitle').textContent = (d.card === '1' ? 'Replace card for ' : 'Assign card to ') + d.name;
+  $('asMsg').textContent = ''; $('asStep1').classList.remove('hide'); $('asStep2').classList.add('hide');
+  const dv = await api('/api/devices');
+  const on = dv.devices.filter(x => x.online);
+  $('asDevice').innerHTML = on.length ? on.map(x => `<option value="${h(x.device_id)}">${h(x.name)}</option>`).join('') : '<option value="">No device is online</option>';
+  $('assignDlg').showModal();
+};
+handlers.assignStart = async () => {
+  await api(`/api/students/${encodeURIComponent(asEnr)}/assign`,'POST',{device_id:$('asDevice').value});
+  const name = $('asDevice').selectedOptions[0].textContent;
+  $('asWait').textContent = `Tap the new card on ${name} now.`;
+  $('asStep1').classList.add('hide'); $('asStep2').classList.remove('hide'); $('asMsg').textContent = '';
+  stopAssignPoll();
+  asTimer = setInterval(async () => {
+    try {
+      const s = await api('/api/assign/status');
+      if(s.state === 'waiting') return;
+      stopAssignPoll();
+      if(s.state === 'done'){ $('asMsg').textContent = s.message; toast(s.message); setTimeout(() => { $('assignDlg').close(); loadStudents(); }, 1200); $('asStep2').classList.add('hide'); }
+      else { $('asMsg').textContent = s.message || 'Could not assign the card.'; $('asStep2').classList.add('hide'); $('asStep1').classList.remove('hide'); }
+    } catch(e){ /* keep polling */ }
+  }, 1500);
+};
+handlers.assignClose = () => $('assignDlg').close();
+$('assignDlg').addEventListener('close', () => { stopAssignPoll(); api('/api/assign/cancel','POST',{}).catch(() => {}); });
+
+/* ================= REPORTS ================= */
+handlers.repview = d => {
+  document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.v === d.v));
+  ['lecture','subject','student'].forEach(v => $('rep-' + v).classList.toggle('hide', v !== d.v));
+};
+$('rlSem').addEventListener('change', () => run(() => fillSubjects('rlSub', $('rlSem').value, {hidden:true, blank:'All subjects'})));
+$('rsSem').addEventListener('change', () => run(() => fillSubjects('rsSub', $('rsSem').value, {hidden:true})));
+$('rtSem').addEventListener('change', () => run(() => Promise.all([
+  fillSubjects('rtSub', $('rtSem').value, {hidden:true, blank:'All subjects'}),
+  fillStudents('rtStu', $('rtSem').value)])));
+function dq(prefix){
+  const q = new URLSearchParams();
+  if($(prefix + 'From').value) q.set('date_from', $(prefix + 'From').value);
+  if($(prefix + 'To').value) q.set('date_to', $(prefix + 'To').value);
+  return q;
+}
+
+handlers.showLectures = async () => {
+  const q = dq('rl');
+  if($('rlSem').value) q.set('semester', $('rlSem').value);
+  if($('rlSub').value) q.set('subject_id', $('rlSub').value);
+  const list = await api('/api/reports/sessions?' + q);
+  const box = $('rlList'); box.classList.remove('hide'); $('rlDetail').classList.add('hide');
+  box.innerHTML = list.length ? `<div class="scroll"><table><thead><tr><th>Date</th><th>Time</th><th>Subject</th><th>Sem</th><th>Device</th><th>Present</th><th></th></tr></thead><tbody>${
+    list.map(s => `<tr><td>${h(s.date)}</td><td>${fmtTime(s.start)}</td><td>${h(s.subject_name)}</td><td>${s.semester}</td><td>${h(s.device_name)}</td>
+      <td>${s.present}/${s.total} ${pct(s.percent)}</td><td class="actions"><button class="btn small primary" data-a="viewLecture" data-id="${s.id}">Open</button></td></tr>`).join('')
+    }</tbody></table></div>` : '<p class="empty">No finished lectures match. Try a wider date range.</p>';
+};
+async function drawLecture(id){
+  const d = await api('/api/reports/session/' + id);
+  const s = d.session, box = $('rlDetail');
+  const p = d.records.filter(r => r.status === 'PRESENT').length;
+  box.classList.remove('hide');
+  box.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div><h2 style="margin:0">${h(s.subject_name)}</h2><p class="muted">${h(s.date)}, semester ${s.semester}, ${h(s.device_name)}. ${p} of ${d.records.length} present.</p></div>
+      <a class="btn" href="/api/export/session/${s.id}.csv">Download CSV</a></div>
+    <div class="scroll"><table><thead><tr><th>Name</th><th>Enrollment</th><th>Status</th><th>Tap time</th><th>Note</th><th></th></tr></thead><tbody>${
+    d.records.map(r => `<tr><td>${h(r.name)}</td><td>${h(r.enrollment)}</td>
+      <td><span class="badge ${r.status === 'PRESENT' ? 'ok' : 'bad'}">${r.status === 'PRESENT' ? 'Present' : 'Absent'}</span>${r.corrected ? ' <span class="badge warn">Corrected</span>' : ''}</td>
+      <td>${fmtSec(r.time)}</td><td>${h(r.note)}</td>
+      <td class="actions"><button class="btn small" data-a="correct" data-sid="${s.id}" data-enr="${h(r.enrollment)}" data-to="${r.status === 'PRESENT' ? 'ABSENT' : 'PRESENT'}">Mark ${r.status === 'PRESENT' ? 'absent' : 'present'}</button></td></tr>`).join('')
+    }</tbody></table></div>`;
+  box.scrollIntoView({behavior:'smooth', block:'start'});
+}
+handlers.viewLecture = d => drawLecture(d.id);
+handlers.correct = async d => {
+  const note = prompt(`Reason for marking ${d.to.toLowerCase()} (optional)`, ''); if(note === null) return;
+  await api('/api/attendance','PUT',{session_id:d.sid, enrollment:d.enr, status:d.to, note});
+  toast('Attendance updated.'); await drawLecture(d.sid);
+};
+
+handlers.showSubject = async () => {
+  const sub = $('rsSub').value; if(!sub) throw new Error('Choose a subject first');
+  const q = dq('rs'); q.set('subject_id', sub);
+  const d = await api('/api/reports/subject?' + q);
+  const box = $('rsOut'); box.classList.remove('hide');
+  if(!d.columns.length){ box.innerHTML = '<p class="empty">No finished lectures for this subject in that range.</p>'; return; }
+  box.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+      <p class="muted">${d.columns.length} lecture(s). P is present, A is absent. Below 75% is shown in red.</p>
+      <a class="btn" href="/api/export/subject.csv?${q}">Download CSV</a></div>
+    <div class="scroll"><table><thead><tr><th class="stick">Name</th><th>Enrollment</th>${d.columns.map(c => `<th>${h(c.label)}</th>`).join('')}<th>Present</th><th>%</th></tr></thead><tbody>${
+    d.rows.map(r => `<tr><td class="stick">${h(r.name)}</td><td>${h(r.enrollment)}</td>${r.marks.map(m => `<td class="mk-${m}">${m}</td>`).join('')}<td>${r.present}/${r.total}</td><td>${pct(r.percent)}</td></tr>`).join('')
+    }</tbody></table></div>`;
+};
+
+handlers.showStudent = async () => {
+  const enr = $('rtStu').value; if(!enr) throw new Error('Choose a student first');
+  const q = dq('rt'); if($('rtSub').value) q.set('subject_id', $('rtSub').value);
+  const d = await api('/api/reports/student/' + encodeURIComponent(enr) + '?' + q);
+  const bits = [d.student.enrollment];
+  if($('rtSub').value) bits.push($('rtSub').selectedOptions[0].textContent);
+  if($('rtFrom').value || $('rtTo').value) bits.push((($('rtFrom').value) || 'start') + ' to ' + (($('rtTo').value) || 'today'));
+  const box = $('rtOut'); box.classList.remove('hide');
+  box.innerHTML = `<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div><h2 style="margin:0">${h(d.student.name)}</h2><p class="muted">${h(bits.join(', '))}</p></div>
+      <a class="btn" href="/api/export/student/${encodeURIComponent(enr)}.csv?${q}">Download CSV</a></div>
+    ${d.summary.length ? `<div class="scroll"><table><thead><tr><th>Subject</th><th>Sem</th><th>Attended</th><th>%</th></tr></thead><tbody>${
+      d.summary.map(s => `<tr><td>${h(s.subject_name)}</td><td>${s.semester}</td><td>${s.present}/${s.total}</td><td>${pct(s.percent)}</td></tr>`).join('')}</tbody></table></div>
+    <h4 style="margin:18px 0 6px">Every lecture</h4>
+    <div class="scroll"><table><thead><tr><th>Date</th><th>Subject</th><th>Status</th><th>Note</th></tr></thead><tbody>${
+      d.records.map(r => `<tr><td>${h(r.date)}</td><td>${h(r.subject_name)}</td><td><span class="badge ${r.status === 'PRESENT' ? 'ok' : 'bad'}">${r.status === 'PRESENT' ? 'Present' : 'Absent'}</span></td><td>${h(r.note)}</td></tr>`).join('')}</tbody></table></div>`
+    : '<p class="empty">No finished attendance for this student with these filters.</p>'}`;
+};
+
+/* ---------- start ---------- */
+(async () => {
+  try {
+    const me = await fetch('/api/me', {credentials:'same-origin'}).then(r => r.json());
+    NUM_SEM = me.num_semesters || 7;
+    me.logged_in ? await showApp() : showLogin();
+  } catch(e){ showLogin(); toast('Cannot reach the server', true); }
+})();
+</script>
+</body>
+</html>
